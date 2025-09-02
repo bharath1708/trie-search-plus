@@ -14,9 +14,7 @@ describe("Trie", () => {
 
   test("delete words", () => {
     const trie = new Trie();
-    trie.insert("apple");
-    trie.insert("app");
-    trie.insert("application");
+    trie.insert(["apple","app","application"]);
     
     expect(trie.search("apple")).toBe(true);
     
@@ -49,7 +47,7 @@ describe("Trie", () => {
 
   test("autocomplete suggestions", () => {
     const trie = new Trie();
-    ["apple", "app", "application", "apartment", "banana"].forEach(w => trie.insert(w));
+    trie.insert(["apple", "app", "application", "apartment", "banana"]);
     
     const suggestions = trie.autocomplete("ap");
     expect(suggestions).toContain("apple");
@@ -63,7 +61,7 @@ describe("Trie", () => {
 
   test("fuzzy search", () => {
     const trie = new Trie();
-    ["apple", "app", "application", "banana", "bath"].forEach(w => trie.insert(w));
+    trie.insert(["apple", "app", "application", "banana", "bath"]);
     
     // Max distance 1
     expect(trie.fuzzySearch("aple", 1)).toContain("apple");
@@ -80,7 +78,7 @@ describe("Trie", () => {
 
   test("wildcard search", () => {
     const trie = new Trie();
-    ["apple", "app", "application", "banana", "bat"].forEach(w => trie.insert(w));
+    trie.insert(["apple", "app", "application", "banana", "bat"]);
     
     expect(trie.wildcardSearch("app.e")).toContain("apple");
     expect(trie.wildcardSearch(".pple")).toContain("apple");
@@ -107,7 +105,7 @@ describe("Trie", () => {
 
   test("list all words", () => {
     const trie = new Trie();
-    ["apple", "app", "banana", "bat"].forEach(w => trie.insert(w));
+    trie.insert(["apple", "app", "banana", "bat"]);
     
     const words = trie.listWords();
     expect(words).toHaveLength(4);
@@ -119,7 +117,7 @@ describe("Trie", () => {
 
   test("suggest words by prefix", () => {
     const trie = new Trie();
-    ["apple", "app", "banana", "bat"].forEach(w => trie.insert(w));
+    trie.insert(["apple", "app", "banana", "bat"]);
 
     expect(trie.autocomplete("ap")).toEqual(expect.arrayContaining(["app", "apple"]));
     expect(trie.autocomplete("ba")).toEqual(expect.arrayContaining(["banana", "bat"]));
@@ -145,7 +143,7 @@ describe("Trie", () => {
   
   test("suggest words with non-alpha prefixes", () => {
     const trie = new Trie();
-    ["hello123", "hello-world", "$pecial", "$$money", "$dollar", "email@example.com"].forEach(w => trie.insert(w));
+    trie.insert(["hello123", "hello-world", "$pecial", "$$money", "$dollar", "email@example.com"]);
   
     expect(trie.autocomplete("hello")).toEqual(expect.arrayContaining(["hello123", "hello-world"]));
     expect(trie.autocomplete("$")).toEqual(expect.arrayContaining(["$pecial", "$$money", "$dollar"]));
