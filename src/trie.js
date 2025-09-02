@@ -10,9 +10,15 @@ export class Trie {
     }
   
     // Insert a word
-    insert(word) {
+    insert(wordOrArray) {
+      if (Array.isArray(wordOrArray)) {
+        for (const word of wordOrArray) {
+          this.insert(word);
+        }
+        return;
+      }
       let node = this.root;
-      for (const char of word) {
+      for (const char of wordOrArray) {
         if (!node.children[char]) {
           node.children[char] = new TrieNode();
         }
