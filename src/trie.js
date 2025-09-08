@@ -1,11 +1,13 @@
 import TrieNode from './trieNode.js';
+import { AbstractTrie } from './AbstractTrie.js';
 
 /**
  * A Trie data structure implementation.
  * Used for efficient string searching, prefix matching, and auto-completion features.
  */
-export class Trie {
+export class Trie extends AbstractTrie {
     constructor() {
+      super();
       this.root = new TrieNode();
     }
   
@@ -177,8 +179,16 @@ export class Trie {
       dfs(this.root, "");
       return results;
     }
+    
+    // Load data into the trie
+    loadData(words) {
+      if (Array.isArray(words)) {
+        for (const word of words) {
+          this.insert(word);
+        }
+      }
+    }
   }
-  
   
   export default Trie;
 // module.exports = Trie;
