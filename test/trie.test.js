@@ -399,4 +399,132 @@ describe("TrieFactory", () => {
     expect(asyncFuzzyResults.some(r => r === "computer" || r.word === "computer")).toBe(true);
     await asyncTrie.terminate();
   });
+
+  // New tests being added
+  
+  test("should respect autoInitialize option for worker implementation", async () => {
+    // Create worker with autoInitialize=false
+    const asyncTrie = TrieFactory.create({ useWorker: true, autoInitialize: false });
+    workersToCleanup.push(asyncTrie);
+    
+    // Worker should not be initialized yet
+    expect(asyncTrie.isInitialized).toBe(false);
+    expect(asyncTrie.worker).toBeNull();
+    
+    // Manually initialize
+    await asyncTrie.initialize();
+    
+    // Now worker should be initialized
+    expect(asyncTrie.isInitialized).toBe(true);
+    expect(asyncTrie.worker).not.toBeNull();
+    
+    // Functionality should work after manual initialization
+    await asyncTrie.loadData(["test"]);
+    expect(await asyncTrie.search("test")).toBe(true);
+    
+    await asyncTrie.terminate();
+  });
+  
+  test("should create multiple independent worker instances", async () => {
+    // Create two worker instances
+    const asyncTrie1 = TrieFactory.create({ useWorker: true });
+    const asyncTrie2 = TrieFactory.create({ useWorker: true });
+    
+    workersToCleanup.push(asyncTrie1, asyncTrie2);
+    
+    // Load different data into each instance
+    await asyncTrie1.loadData(["apple", "banana"]);
+    await asyncTrie2.loadData(["cherry", "date"]);
+    
+    // Each instance should only have its own data
+    expect(await asyncTrie1.search("apple")).toBe(true);
+    expect(await asyncTrie1.search("cherry")).toBe(false);
+    
+    expect(await asyncTrie2.search("cherry")).toBe(true);
+    expect(await asyncTrie2.search("apple")).toBe(false);
+    
+    // Clean up
+    await asyncTrie1.terminate();
+    await asyncTrie2.terminate();
+  });
+  
+  test("should handle initialization/termination cycles correctly", async () => {
+    // Create and immediately terminate
+    const asyncTrie = TrieFactory.create({ useWorker: true });
+    await asyncTrie.terminate();
+    
+    // Should be able to re-initialize the same instance
+    await asyncTrie.initialize();
+    expect(asyncTrie.isInitialized).toBe(true);
+    
+    // Should work after re-initialization
+    await asyncTrie.loadData(["reinitialized"]);
+    expect(await asyncTrie.search("reinitialized")).toBe(true);
+    
+    // Clean up
+    workersToCleanup.push(asyncTrie);
+  });
+  
+  test("should handle empty data correctly in both implementations", async () => {
+    const syncTrie = TrieFactory.create();
+    const asyncTrie = TrieFactory.create({ useWorker: true });
+    workersToCleanup.push(asyncTrie);
+    
+    // Test with empty arrays
+    syncTrie.loadData([]);
+    await asyncTrie.loadData([]);
+    
+    // Operations should work on empty tries
+    expect(syncTrie.search("anything")).toBe(false);
+    expect(await asyncTrie.search("anything")).toBe(false);
+    
+    expect(syncTrie.autocomplete("a")).toEqual([]);
+    expect(await asyncTrie.autocomplete("a")).toEqual([]);
+    
+    // Clean up
+    await asyncTrie.terminate();
+  });
+  
+  test("should support all trie operations across both implementations", async () => {
+    const syncTrie = TrieFactory.create();
+    const asyncTrie = TrieFactory.create({ useWorker: true });
+    workersToCleanup.push(asyncTrie);
+    
+    // Populate data
+    const testWords = ["testing", "tested", "tester"];
+    syncTrie.loadData(testWords);
+    await asyncTrie.loadData(testWords);
+    
+    // Test various operations
+    const operations = [
+      // Operation name, args, expected result pattern
+      ["search", ["testing"], true],
+      ["search", ["nonexistent"], false],
+      ["autocomplete", ["test"], expect.arrayContaining(["testing", "tested", "tester"])],
+      ["fuzzySearch", ["testin", 1], expect.arrayContaining(["testing"])],
+      // Note: wildcardSearch implementation differs between sync and worker versions
+    ];
+    
+    for (const [op, args, expected] of operations) {
+      // Test synchronous implementation
+      const syncResult = syncTrie[op](...args);
+      expect(syncResult).toEqual(expected);
+      
+      // Test asynchronous implementation
+      const asyncResult = await asyncTrie[op](...args);
+      
+      // Handle special case of fuzzySearch which returns different formats
+      if (op === "fuzzySearch") {
+        if (Array.isArray(asyncResult)) {
+          // Handle case where asyncResult might be array of objects with word property
+          const normalizedResult = asyncResult.map(r => typeof r === 'string' ? r : r.word);
+          expect(normalizedResult).toEqual(expect.arrayContaining(testWords.filter(w => expected.asymmetricMatch([w]))));
+        }
+      } else {
+        expect(asyncResult).toEqual(expected);
+      }
+    }
+    
+    await asyncTrie.terminate();
+  });
 });
