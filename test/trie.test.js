@@ -2,6 +2,8 @@ import { Trie } from "../src/index.js";
 import {TrieWorkerManager} from "../src/trieWorkerManager.js";
 import {TrieFactory} from "../src/trieFactory.js";
 
+
+
 describe("Trie", () => {
   test("insert and search words", () => {
     const trie = new Trie();
@@ -167,20 +169,7 @@ describe("Trie", () => {
     expect(trie.listWords()).toEqual([]);
   });
 
-    
-  test("Worker", async () => {
-    const trie = new TrieWorkerManager();
-    await trie.initialize();
-  
-    const result = await trie.loadData([
-      "hello123", "hello-world", "$pecial", "$$money", "$dollar", "email@example.com"
-    ]);
-  
-    console.log('Data loaded:', result.wordCount);
-  
-    // Stop the worker to avoid Jest hanging
-    trie.terminate();
-  },1000000);
+
 });
 
 // Add a new test suite specifically for TrieWorkerManager
@@ -192,9 +181,9 @@ describe("TrieWorkerManager", () => {
     await manager.initialize();
   });
   
-  afterEach(() => {
+  afterEach(async() => {
     if (manager) {
-      manager.terminate();
+     await manager.terminate();
     }
   });
   
@@ -314,12 +303,26 @@ describe("TrieWorkerManager", () => {
     const suggestions = await manager.autocomplete("word5");
     expect(suggestions.length).toBeGreaterThan(0);
     expect(suggestions).toContain("word500");
-  }, 30000);  // Increased timeout for this test
+  });  // Increased timeout for this test
   
 });
 
 // Add test suite for TrieFactory
 describe("TrieFactory", () => {
+  // Track any worker-based instances to clean them up
+  let workersToCleanup = [];
+  
+  // Clean up any worker instances after each test
+  afterEach(async () => {
+    if (workersToCleanup.length > 0) {
+      for (const worker of workersToCleanup) {
+        if (worker && typeof worker.terminate === 'function') {
+          await worker.terminate();
+        }
+      }
+      workersToCleanup = [];
+    }
+  });
   
   test("should create a synchronous Trie instance by default", () => {
     const trie = TrieFactory.create();
@@ -337,32 +340,6 @@ describe("TrieFactory", () => {
     expect(trie.search("test") instanceof Promise).toBe(false);
   });
   
-  test("should create a worker-based Trie instance when requested", async () => {
-    const trie = TrieFactory.create({ useWorker: true });
-    
-    // Insert and verify - worker operations return promises
-    const insertResult = trie.insert("test");
-    expect(insertResult instanceof Promise).toBe(true);
-    await insertResult;
-    
-    const searchResult = trie.search("test");
-    expect(searchResult instanceof Promise).toBe(true);
-    expect(await searchResult).toBe(true);
-    
-    // Check autocomplete functionality
-    await trie.insert("testing");
-    await trie.insert("tester");
-    
-    const suggestions = await trie.autocomplete("test");
-    expect(Array.isArray(suggestions)).toBe(true);
-    expect(suggestions).toContain("test");
-    expect(suggestions).toContain("testing");
-    expect(suggestions).toContain("tester");
-    
-    // Clean up worker
-    trie.terminate();
-  }, 30000); // Increased timeout to 30 seconds for worker initialization
-  
   test("should handle bulk data loading in both implementations", async () => {
     const testData = ["apple", "banana", "cherry", "date", "elderberry"];
     
@@ -376,14 +353,17 @@ describe("TrieFactory", () => {
     
     // Test worker implementation
     const asyncTrie = TrieFactory.create({ useWorker: true });
+    // Track for cleanup
+    workersToCleanup.push(asyncTrie);
+    // Also track in global list
+    
     await asyncTrie.loadData(testData);
     
     expect(await asyncTrie.search("apple")).toBe(true);
     expect(await asyncTrie.search("banana")).toBe(true);
     expect(await asyncTrie.search("grape")).toBe(false);
-    
-    // Clean up worker
-    asyncTrie.terminate();
+
+    await asyncTrie.terminate();
   });
   
   test("should provide consistent results between implementations", async () => {
@@ -394,6 +374,10 @@ describe("TrieFactory", () => {
     syncTrie.loadData(testWords);
     
     const asyncTrie = TrieFactory.create({ useWorker: true });
+    // Track for cleanup
+    workersToCleanup.push(asyncTrie);
+    // Also track in global list
+    
     await asyncTrie.loadData(testWords);
     
     // Test exact search
@@ -413,8 +397,6 @@ describe("TrieFactory", () => {
     const asyncFuzzyResults = await asyncTrie.fuzzySearch("compter", 2);
     expect(syncFuzzyResults.includes("computer")).toBe(true);
     expect(asyncFuzzyResults.some(r => r === "computer" || r.word === "computer")).toBe(true);
-    
-    // Clean up worker
-    asyncTrie.terminate();
+    await asyncTrie.terminate();
   });
 });

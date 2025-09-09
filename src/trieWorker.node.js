@@ -4,16 +4,22 @@ import { handleWorkerMessage } from './trieWorker.js';
 if (parentPort) {
   parentPort.on('message', (data) => {
     try {
-      console.log('Node worker received:', data);
+      // Special handling for terminate action
+      if (data.action === 'terminate') {
+        // Allow any pending operations to complete
+        setTimeout(() => {
+          process.exit(0); // Force exit the worker thread
+        }, 10);
+        return;
+      }
+      
       handleWorkerMessage({ 
         ...data, 
         postMessage: (message) => {
-          console.log('Node worker sending response:', message);
           parentPort.postMessage(message);
         }
       });
     } catch (error) {
-      console.error('Error in worker:', error);
       parentPort.postMessage({ status: 'error', error: error.message });
     }
   });

@@ -87,9 +87,12 @@ export class TrieWorkerManager extends AbstractTrie {
     });
   }
 
-  terminate() {
+  async terminate() {
     if (this.worker) {
-      this.worker.terminate();
+      this.worker.onmessage = null;   // ✅ detach handler
+      this.worker.onerror = null;     // optional, in case you use it
+      this.worker.removeAllListeners?.();
+      await this.worker.terminate();
       this.worker = null;
       this.isInitialized = false;
     }
