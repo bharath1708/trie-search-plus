@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Wildcard Search Visualization</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #canvas {
+            background-color: white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 18px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        h1 {
+            color: #202124;
+            margin-bottom: 10px;
+        }
+        .description {
+            color: #5f6368;
+            text-align: center;
+            max-width: 700px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Wildcard Search Visualization</h1>
+    <div class="description">
+        Visualizing how wildcard search works in a trie structure with pattern matching.
+        Wildcards allow for flexible search by matching any character at specific positions.
+    </div>
+    <div class="controls">
+        <button id="dotBtn">Example: "ap..e" → "apple"</button>
+        <button id="starBtn">Example: "ap*" → Multiple matches</button>
+        <button id="downloadBtn">Download Image</button>
+    </div>
+    <canvas id="canvas" width="900" height="800"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Current search pattern and type
+        let currentPattern = "ap..e";
+        let patternType = "dot"; // "dot" or "star"
+        
+        // Trie node class for visualization
+        class TrieNode {
+            constructor(char) {
+                this.char = char;
+                this.children = {};
+                this.isEndOfWord = false;
+                this.x = 0;
+                this.y = 0;
+                this.width = 40;
+                this.height = 40;
+                this.highlighted = false;
+                this.wildcardMatch = false;
+                this.id = Math.random().toString(36).substr(2, 9);
+                this.word = ''; // Store full word for end nodes
+            }
+        }
+
+        // Create the trie structure
+        function createTrie() {
+            const root = new TrieNode('');
+            const words = ['apple', 'apply', 'apron', 'apartment', 'banana', 'ball', 'cat'];
+            
+            for (const word of words) {
+                let node = root;
+                for (const char of word) {
+                    if (!node.children[char]) {
+                        node.children[char] = new TrieNode(char);
+                    }
+                    node = node.children[char];
+                }
+                node.isEndOfWord = true;
+                node.word = word; // Store the complete word at end nodes
+            }
+            
+            return root;
+        }
+        
+        // Position nodes for visualization
+        function positionNodes(node, x, y, levelWidth, depth = 0, parentBranch = null) {
+            node.x = x;
+            node.y = y;
+            node.depth = depth;
+            node.parentBranch = parentBranch;
+            
+            const children = Object.values(node.children);
+            const childCount = children.length;
+            
+            if (childCount === 0) return;
+            
+            // Calculate spacing based on depth to improve layout
+            const spacing = Math.min(levelWidth / childCount, 100 - depth * 5);
+            let startX = x - (spacing * (childCount - 1) / 2);
+            
+            children.forEach((child, i) => {
+                const childX = startX + i * spacing;
+                const childY = y + 65; // Fixed vertical spacing
+                const branchKey = Object.keys(node.children).find(key => node.children[key] === child);
+                positionNodes(child, childX, childY, levelWidth * 0.85, depth + 1, branchKey);
+            });
+        }
+        
+        // Highlight nodes that match the wildcard pattern
+        function highlightWildcardPattern(root, pattern, patternType) {
+            // Reset highlighting
+            resetHighlight(root);
+            
+            if (patternType === "dot") {
+                // "." wildcard (matches exactly one character)
+                highlightDotWildcardPattern(root, pattern, 0);
+            } else {
+                // "*" wildcard (matches zero or more characters)
+                highlightStarWildcardPattern(root, pattern, 0, []);
+            }
+        }
+        
+        function resetHighlight(node) {
+            node.highlighted = false;
+            node.wildcardMatch = false;
+            
+            for (const child of Object.values(node.children)) {
+                resetHighlight(child);
+            }
+        }
+        
+        function highlightDotWildcardPattern(node, pattern, index) {
+            // Base case: reached end of pattern
+            if (index === pattern.length) {
+                if (node.isEndOfWord) {
+                    node.highlighted = true;
+                }
+                return;
+            }
+            
+            const char = pattern[index];
+            
+            if (char === '.') {
+                // Wildcard - can match any one character
+                node.wildcardMatch = true;
+                for (const [childChar, childNode] of Object.entries(node.children)) {
+                    highlightDotWildcardPattern(childNode, pattern, index + 1);
+                }
+            } else {
+                // Regular character match
+                if (node.children[char]) {
+                    highlightDotWildcardPattern(node.children[char], pattern, index + 1);
+                }
+            }
+        }
+        
+        function highlightStarWildcardPattern(node, pattern, index, matchPath) {
+            // Star wildcard implementation
+            // If we've reached the end of the pattern at the star
+            if (index === pattern.length - 1 && pattern[index] === '*') {
+                // Mark all paths from here as matches
+                markSubtreeAsMatch(node);
+                return;
+            }
+            
+            // If we've reached the end of the pattern (not a star)
+            if (index === pattern.length) {
+                if (node.isEndOfWord) {
+                    node.highlighted = true;
+                    matchPath.forEach(n => {
+                        if (!n.highlighted) n.wildcardMatch = true;
+                    });
+                }
+                return;
+            }
+            
+            const char = pattern[index];
+            
+            if (char === '*') {
+                // Star wildcard can match zero or more characters
+                // Case 1: Skip the star (match zero)
+                highlightStarWildcardPattern(node, pattern, index + 1, [...matchPath, node]);
+                
+                // Case 2: Match any path in the subtree (match one or more)
+                for (const childNode of Object.values(node.children)) {
+                    // First follow this path
+                    highlightStarWildcardPattern(childNode, pattern, index, [...matchPath, node]);
+                    // Then consider the star consumed and continue with next pattern char
+                    highlightStarWildcardPattern(childNode, pattern, index + 1, [...matchPath, node]);
+                }
+            } else {
+                // Regular character match
+                if (node.children[char]) {
+                    highlightStarWildcardPattern(node.children[char], pattern, index + 1, [...matchPath, node]);
+                }
+            }
+        }
+        
+        function markSubtreeAsMatch(node) {
+            if (node.isEndOfWord) {
+                node.highlighted = true;
+            } else {
+                node.wildcardMatch = true;
+            }
+            
+            for (const childNode of Object.values(node.children)) {
+                markSubtreeAsMatch(childNode);
+            }
+        }
+        
+        // Draw the trie
+        function drawTrie(root) {
+            // Get all nodes in depth-first order
+            const allNodes = [];
+            collectNodes(root, allNodes);
+            
+            // Draw edges first (so they appear behind nodes)
+            for (const node of allNodes) {
+                if (node !== root) { // Skip root as it has no parent
+                    // Find parent
+                    const parent = findParentNode(root, node);
+                    if (parent) {
+                        drawEdge(parent, node);
+                    }
+                }
+            }
+            
+            // Then draw nodes on top
+            for (const node of allNodes) {
+                drawNode(node);
+            }
+        }
+        
+        function collectNodes(node, nodeList) {
+            nodeList.push(node);
+            for (const childNode of Object.values(node.children)) {
+                collectNodes(childNode, nodeList);
+            }
+        }
+        
+        function findParentNode(current, targetNode) {
+            // Check direct children
+            for (const childNode of Object.values(current.children)) {
+                if (childNode === targetNode) return current;
+            }
+            
+            // Recursively check grandchildren
+            for (const childNode of Object.values(current.children)) {
+                const found = findParentNode(childNode, targetNode);
+                if (found) return found;
+            }
+            
+            return null;
+        }
+        
+        function drawNode(node) {
+            const radius = node.width / 2;
+            
+            // Draw node circle
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+            
+            if (node.highlighted) {
+                ctx.fillStyle = '#34a853'; // Green for matched end nodes
+                ctx.strokeStyle = '#0d652d';
+                ctx.lineWidth = 2.5;
+            } else if (node.wildcardMatch) {
+                ctx.fillStyle = '#fbbc04'; // Yellow for wildcard matches
+                ctx.strokeStyle = '#ea8600';
+                ctx.lineWidth = 2;
+            } else if (node.isEndOfWord) {
+                ctx.fillStyle = '#e8f5e9'; // Light green for end of word
+                ctx.strokeStyle = '#81c784';
+                ctx.lineWidth = 1.5;
+            } else {
+                ctx.fillStyle = '#e8eaed'; // Light gray for regular nodes
+                ctx.strokeStyle = '#dadce0';
+                ctx.lineWidth = 1;
+            }
+            
+            ctx.fill();
+            ctx.stroke();
+            
+            // Draw character in node
+            if (node.highlighted) {
+                ctx.fillStyle = 'white';
+            } else if (node.wildcardMatch) {
+                ctx.fillStyle = '#5f2800';
+            } else {
+                ctx.fillStyle = '#202124';
+            }
+            
+            ctx.font = (node.char === '') ? 'bold 12px "Segoe UI", Arial, sans-serif' : 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(node.char || 'ROOT', node.x, node.y);
+            
+            // Label for end of word nodes
+            if (node.isEndOfWord) {
+                ctx.font = '12px "Segoe UI", Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillStyle = node.highlighted ? 'white' : '#5f6368';
+                ctx.fillText(node.word, node.x, node.y + radius + 10);
+                
+                // Draw background for matched word if highlighted
+                if (node.highlighted) {
+                    const textWidth = ctx.measureText(node.word).width;
+                    ctx.fillStyle = 'rgba(52, 168, 83, 0.2)';
+                    ctx.fillRect(node.x - textWidth/2 - 5, node.y + radius + 5, textWidth + 10, 20);
+                }
+            }
+        }
+        
+        function drawEdge(parent, child) {
+            ctx.beginPath();
+            ctx.moveTo(parent.x, parent.y + parent.height / 2);
+            ctx.lineTo(child.x, child.y - child.height / 2);
+            
+            // Color edge based on match state
+            if (child.highlighted || child.wildcardMatch) {
+                ctx.strokeStyle = child.highlighted ? '#34a853' : '#fbbc04';
+                ctx.lineWidth = child.highlighted ? 2.5 : 2;
+            } else {
+                ctx.strokeStyle = '#dadce0';
+                ctx.lineWidth = 1;
+            }
+            
+            ctx.stroke();
+        }
+        
+        function drawWildcardSearchVisualization() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw title
+            ctx.fillStyle = '#202124';
+            ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Wildcard Search in Trie Data Structure', canvas.width / 2, 40);
+            
+            // Draw subtitle
+            const subtitleText = patternType === "dot" ? 
+                `Pattern "${currentPattern}" (. matches any single character)` :
+                `Pattern "${currentPattern}" (* matches zero or more characters)`;
+            
+            ctx.font = '18px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.fillText(subtitleText, canvas.width / 2, 70);
+            
+            // Create and setup trie
+            const trie = createTrie();
+            positionNodes(trie, canvas.width / 2, 120, 600);
+            highlightWildcardPattern(trie, currentPattern, patternType);
+            
+            // Draw visualization
+            drawTrie(trie);
+            
+            // Draw legend
+            drawLegend();
+            
+            // Draw explanation
+            drawExplanation();
+            
+            // Draw bottom caption with matches
+            drawMatchesCaption();
+            
+            // Draw bottom signature
+            drawBottomCaption();
+        }
+        
+        function drawLegend() {
+            const legendTop = 520;
+            const legendLeft = 50;
+            
+            // Background box
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(legendLeft - 15, legendTop - 15, 240, 150);
+            ctx.strokeStyle = '#dadce0';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(legendLeft - 15, legendTop - 15, 240, 150);
+            
+            // Title
+            ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#202124';
+            ctx.textAlign = 'left';
+            ctx.fillText('Legend:', legendLeft, legendTop);
+            
+            // Regular node
+            drawLegendItem(legendLeft, legendTop + 25, '#e8eaed', 'Regular Node');
+            
+            // End of word node
+            drawLegendItem(legendLeft, legendTop + 55, '#e8f5e9', 'End of Word Node');
+            
+            // Wildcard match node
+            drawLegendItem(legendLeft, legendTop + 85, '#fbbc04', 'Wildcard Match');
+            
+            // Final match node
+            drawLegendItem(legendLeft, legendTop + 115, '#34a853', 'Final Match (Complete Word)');
+        }
+        
+        function drawLegendItem(x, y, color, label) {
+            // Draw circle
+            ctx.beginPath();
+            ctx.arc(x + 12, y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#dadce0';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Draw label
+            ctx.font = '14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.textAlign = 'left';
+            ctx.fillText(label, x + 30, y + 5);
+        }
+        
+        function drawExplanation() {
+            const explanationTop = 520;
+            const explanationLeft = 300;
+            const columnWidth = 280;
+            
+            // Background box
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(explanationLeft - 15, explanationTop - 15, columnWidth * 2 + 30, 190);
+            ctx.strokeStyle = '#dadce0';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(explanationLeft - 15, explanationTop - 15, columnWidth * 2 + 30, 190);
+            
+            // Wildcard types title
+            ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#202124';
+            ctx.textAlign = 'left';
+            ctx.fillText('Wildcard Types:', explanationLeft, explanationTop);
+            
+            // Dot wildcard
+            ctx.font = 'bold 14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#1a73e8';
+            ctx.textAlign = 'left';
+            ctx.fillText('Dot Wildcard (.)', explanationLeft, explanationTop + 30);
+            
+            // Dot explanation
+            ctx.font = '14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            const dotExplanation = [
+                '• Matches any single character',
+                '• Example: "ap..e" matches "apple"',
+                '• Does NOT match "apie" or "apartment"',
+                '• Precise position matching'
+            ];
+            
+            dotExplanation.forEach((line, i) => {
+                ctx.fillText(line, explanationLeft + 15, explanationTop + 55 + (i * 22));
+            });
+            
+            // Star wildcard
+            ctx.font = 'bold 14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#1a73e8';
+            ctx.textAlign = 'left';
+            ctx.fillText('Star Wildcard (*)', explanationLeft + columnWidth, explanationTop + 30);
+            
+            // Star explanation
+            ctx.font = '14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            const starExplanation = [
+                '• Matches zero or more characters',
+                '• Example: "ap*" matches "apple", "apply",',
+                '  "apron", "apartment", etc.',
+                '• More flexible pattern matching'
+            ];
+            
+            starExplanation.forEach((line, i) => {
+                ctx.fillText(line, explanationLeft + columnWidth + 15, explanationTop + 55 + (i * 22));
+            });
+            
+            // Additional explanation
+            ctx.font = 'italic 14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.textAlign = 'center';
+            ctx.fillText('Wildcards are essential for flexible text search and pattern matching in applications.', canvas.width / 2, explanationTop + 160);
+        }
+        
+        function drawMatchesCaption() {
+            const matchesY = 720;
+            ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#202124';
+            ctx.textAlign = 'center';
+            
+            // Create highlighted background
+            ctx.fillStyle = '#f0f8ff';
+            ctx.fillRect(canvas.width/2 - 300, matchesY - 20, 600, 40);
+            ctx.strokeStyle = '#c0d8ea';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(canvas.width/2 - 300, matchesY - 20, 600, 40);
+            
+            // Draw text
+            ctx.fillStyle = '#1a73e8';
+            if (patternType === "dot") {
+                ctx.fillText('Pattern "ap..e" matches: apple', canvas.width / 2, matchesY);
+            } else {
+                ctx.fillText('Pattern "ap*" matches: apple, apply, apron, apartment', canvas.width / 2, matchesY);
+            }
+        }
+        
+        function drawBottomCaption() {
+            const captionY = canvas.height - 30;
+            
+            ctx.font = 'italic 14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.textAlign = 'center';
+            ctx.fillText('Trie-Search-Plus Library - Wildcard Search Implementation', canvas.width / 2, captionY);
+        }
+        
+        function drawColorSquare(x, y, color) {
+            ctx.fillStyle = color;
+            ctx.strokeStyle = '#dadce0';
+            ctx.lineWidth = 1;
+            ctx.fillRect(x, y - 10, 20, 20);
+            ctx.strokeRect(x, y - 10, 20, 20);
+        }
+
+        // Initialize
+        drawWildcardSearchVisualization();
+
+        // Event listeners for buttons
+        document.getElementById('dotBtn').addEventListener('click', () => {
+            patternType = "dot";
+            currentPattern = "ap..e";
+            drawWildcardSearchVisualization();
+        });
+
+        document.getElementById('starBtn').addEventListener('click', () => {
+            patternType = "star";
+            currentPattern = "ap*";
+            drawWildcardSearchVisualization();
+        });
+
+        // Download functionality
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'wildcard-search.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>

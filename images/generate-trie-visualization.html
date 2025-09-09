@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trie Data Structure Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #canvas {
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Trie Data Structure Visualization</h1>
+    <div class="controls">
+        <button id="downloadBtn">Download Image</button>
+    </div>
+    <canvas id="canvas" width="800" height="700"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Trie node class for visualization
+        class TrieNode {
+            constructor(char) {
+                this.char = char;
+                this.children = {};
+                this.isEndOfWord = false;
+                this.x = 0;
+                this.y = 0;
+                this.width = 40;
+                this.height = 40;
+            }
+        }
+
+        // Create a simple trie
+        function createTrie() {
+            const root = new TrieNode('');
+            const words = ['apple', 'application', 'banana'];
+            
+            for (const word of words) {
+                let node = root;
+                for (const char of word) {
+                    if (!node.children[char]) {
+                        node.children[char] = new TrieNode(char);
+                    }
+                    node = node.children[char];
+                }
+                node.isEndOfWord = true;
+            }
+            
+            return root;
+        }
+
+        // Position nodes for visualization
+        function positionNodes(node, x, y, levelWidth, depth = 0) {
+            node.x = x;
+            node.y = y;
+            
+            const children = Object.values(node.children);
+            if (children.length === 0) return;
+            
+            const childWidth = levelWidth / children.length;
+            let currentX = x - (levelWidth / 2) + (childWidth / 2);
+            
+            for (const child of children) {
+                positionNodes(child, currentX, y + 80, childWidth, depth + 1);
+                currentX += childWidth;
+            }
+        }
+
+        // Draw the trie
+        function drawTrie(node, parent = null) {
+            // Draw edge from parent to this node
+            if (parent) {
+                ctx.beginPath();
+                ctx.moveTo(parent.x, parent.y + parent.height / 2);
+                ctx.lineTo(node.x, node.y - node.height / 2);
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            
+            // Draw node circle
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, node.width / 2, 0, Math.PI * 2);
+            if (node.isEndOfWord) {
+                ctx.fillStyle = '#ffcccb'; // Light red for end of word
+            } else {
+                ctx.fillStyle = '#add8e6'; // Light blue for regular nodes
+            }
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw character in node
+            ctx.fillStyle = 'black';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(node.char || 'ROOT', node.x, node.y);
+            
+            // Draw the word if it's end of word
+            if (node.isEndOfWord) {
+                let current = node;
+                let word = '';
+                while (current.char) {
+                    word = current.char + word;
+                    current = Object.values(current.children)[0];
+                    if (!current) break;
+                }
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+                ctx.fillText('(End)', node.x, node.y + node.height / 2 + 15);
+            }
+            
+            // Draw children
+            for (const child of Object.values(node.children)) {
+                drawTrie(child, node);
+            }
+        }
+
+        function drawTrieWithWords() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Title
+            ctx.fillStyle = '#333';
+            ctx.font = '24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Trie Data Structure with Sample Words', canvas.width / 2, 30);
+            
+            // Create and position the trie
+            const root = createTrie();
+            positionNodes(root, canvas.width / 2, 100, canvas.width * 0.8);
+            
+            // Draw the trie
+            drawTrie(root);
+            
+            // Draw sample words legend
+            const words = ['apple', 'application', 'banana'];
+            ctx.fillStyle = '#333';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'left';
+            
+            ctx.fillText('Sample Words:', 50, canvas.height - 100);
+            words.forEach((word, idx) => {
+                ctx.fillText(`- ${word}`, 70, canvas.height - 70 + idx * 25);
+            });
+            
+            // Add explanation
+            ctx.textAlign = 'center';
+            ctx.fillText('Shared prefixes are represented by common paths in the trie', canvas.width / 2, canvas.height - 20);
+        }
+
+        // Initialize
+        drawTrieWithWords();
+
+        // Download functionality
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'trie-visualization.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>

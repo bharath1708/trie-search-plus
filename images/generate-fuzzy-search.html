@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fuzzy Search Visualization</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #canvas {
+            background-color: white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 18px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #3367d6;
+        }
+        h1 {
+            color: #202124;
+            margin-bottom: 10px;
+        }
+        .description {
+            color: #5f6368;
+            text-align: center;
+            max-width: 700px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fuzzy Search Visualization</h1>
+    <div class="description">
+        Visualizing Levenshtein distance calculation and fuzzy search matching in a trie structure.
+        This diagram shows how misspelled words can still find matches through edit distance calculation.
+    </div>
+    <div class="controls">
+        <button id="example1Btn">Example: "aple" → "apple"</button>
+        <button id="example2Btn">Example: "aplication" → "application"</button>
+        <button id="downloadBtn">Download Image</button>
+    </div>
+    <canvas id="canvas" width="900" height="800"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        let currentExample = 1;
+        let searchWord = "aple";
+        let matchWord = "apple";
+        let maxDistance = 1;
+        
+        function drawFuzzySearchVisualization() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw title
+            ctx.fillStyle = '#202124';
+            ctx.font = 'bold 24px "Segoe UI", Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Fuzzy Search with Levenshtein Distance', canvas.width / 2, 40);
+            
+            // Draw subtitle with current example
+            ctx.font = '18px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.fillText(`Finding "${matchWord}" with misspelled query "${searchWord}" (max distance: ${maxDistance})`, canvas.width / 2, 70);
+            
+            // Draw Levenshtein distance matrix section
+            drawLevenshteinMatrix();
+            
+            // Draw trie visualization section
+            drawTrieVisualization();
+            
+            // Draw explanations
+            drawExplanations();
+
+            // Draw bottom caption
+            drawBottomCaption();
+        }
+        
+        function drawLevenshteinMatrix() {
+            const matrixTop = 120;
+            const matrixLeft = 70;
+            const cellSize = 42;
+            
+            // Create Levenshtein distance matrix
+            const matrix = createLevenshteinMatrix(searchWord, matchWord);
+            
+            // Draw matrix header
+            ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#202124';
+            ctx.textAlign = 'center';
+            ctx.fillText("Levenshtein Distance Matrix", matrixLeft + (matchWord.length + 1) * cellSize / 2, matrixTop - 20);
+            
+            // Draw matrix cells
+            for (let i = 0; i <= searchWord.length; i++) {
+                for (let j = 0; j <= matchWord.length; j++) {
+                    const x = matrixLeft + j * cellSize;
+                    const y = matrixTop + i * cellSize;
+                    
+                    // Cell background
+                    if (i === searchWord.length && j === matchWord.length) {
+                        // Final distance cell
+                        ctx.fillStyle = '#d7f9d4';
+                    } else if (i === 0 || j === 0) {
+                        // Header cells
+                        ctx.fillStyle = '#e8eaed';
+                    } else if (searchWord[i - 1] === matchWord[j - 1]) {
+                        // Matching characters
+                        ctx.fillStyle = '#e0f1fd';
+                    } else if (matrix[i][j] === matrix[i-1][j-1] + 1) {
+                        // Substitution operation
+                        ctx.fillStyle = '#fde9c7';
+                    } else {
+                        // Insert or delete operations
+                        ctx.fillStyle = '#fde8e4';
+                    }
+                    
+                    // Draw cell
+                    ctx.fillRect(x, y, cellSize, cellSize);
+                    ctx.strokeStyle = '#dadce0';
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(x, y, cellSize, cellSize);
+                    
+                    // Cell value
+                    ctx.fillStyle = '#202124';
+                    ctx.font = '16px "Segoe UI", Arial, sans-serif';
+                    ctx.textAlign = 'center';
+                    
+                    // Draw labels for first row and column
+                    if (i === 0 && j === 0) {
+                        ctx.fillText("", x + cellSize / 2, y + cellSize / 2 + 6);
+                    } else if (i === 0) {
+                        ctx.fillStyle = '#1a73e8';
+                        ctx.fillText(matchWord[j - 1], x + cellSize / 2, y + cellSize / 2 + 6);
+                    } else if (j === 0) {
+                        ctx.fillStyle = '#1a73e8';
+                        ctx.fillText(searchWord[i - 1], x + cellSize / 2, y + cellSize / 2 + 6);
+                    } else {
+                        // Regular cell with distance value
+                        ctx.fillStyle = '#202124';
+                        ctx.fillText(matrix[i][j].toString(), x + cellSize / 2, y + cellSize / 2 + 6);
+                    }
+                }
+            }
+            
+            // Add annotations for operations
+            const finalDistance = matrix[searchWord.length][matchWord.length];
+            const annotationsY = matrixTop + (searchWord.length + 1) * cellSize + 30;
+            
+            ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#202124';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Final Distance: ${finalDistance}`, matrixLeft, annotationsY);
+            
+            ctx.font = '14px "Segoe UI", Arial, sans-serif';
+            let operationsText = `Operations needed: `;
+            
+            // Highlight differences between the words
+            if (currentExample === 1) {
+                operationsText += `Insert 'p' (aple → apple)`;
+            } else {
+                operationsText += `Insert 'p' (aplication → application)`;
+            }
+            
+            ctx.fillText(operationsText, matrixLeft, annotationsY + 25);
+            
+            // Add color legend
+            const legendY = annotationsY + 60;
+            ctx.font = '14px "Segoe UI", Arial, sans-serif';
+            
+            drawColorSquare(matrixLeft, legendY, '#e0f1fd');
+            ctx.fillText('Match', matrixLeft + 25, legendY);
+            
+            drawColorSquare(matrixLeft + 90, legendY, '#fde9c7');
+            ctx.fillText('Substitution', matrixLeft + 115, legendY);
+            
+            drawColorSquare(matrixLeft + 200, legendY, '#fde8e4');
+            ctx.fillText('Insert/Delete', matrixLeft + 225, legendY);
+            
+            drawColorSquare(matrixLeft + 320, legendY, '#d7f9d4');
+            ctx.fillText('Final Distance', matrixLeft + 345, legendY);
+        }
+        
+        function createLevenshteinMatrix(s1, s2) {
+            const m = s1.length;
+            const n = s2.length;
+            const dp = Array(m + 1).fill().map(() => Array(n + 1).fill(0));
+            
+            // Initialize first row and column
+            for (let i = 0; i <= m; i++) dp[i][0] = i;
+            for (let j = 0; j <= n; j++) dp[0][j] = j;
+            
+            // Fill the matrix
+            for (let i = 1; i <= m; i++) {
+                for (let j = 1; j <= n; j++) {
+                    if (s1[i - 1] === s2[j - 1]) {
+                        dp[i][j] = dp[i - 1][j - 1];
+                    } else {
+                        dp[i][j] = Math.min(
+                            dp[i - 1][j - 1] + 1, // substitution
+                            dp[i - 1][j] + 1,     // deletion
+                            dp[i][j - 1] + 1      // insertion
+                        );
+                    }
+                }
+            }
+            
+            return dp;
+        }
+        
+        function drawTrieVisualization() {
+            const trieTop = 120;
+            const trieRight = canvas.width - 70;
+            const trieWidth = 400;
+            const trieHeight = 300;
+            
+            // Draw trie section header
+            ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#202124';
+            ctx.textAlign = 'center';
+            ctx.fillText("Trie Structure with Fuzzy Search", trieRight - trieWidth/2, trieTop - 20);
+            
+            // Create example trie
+            if (currentExample === 1) {
+                drawExampleTrie1(trieRight - trieWidth/2, trieTop + 40, trieWidth, trieHeight);
+            } else {
+                drawExampleTrie2(trieRight - trieWidth/2, trieTop + 40, trieWidth, trieHeight);
+            }
+        }
+        
+        function drawExampleTrie1(centerX, centerY, width, height) {
+            // Draw root node
+            const nodeRadius = 25;
+            drawNode(centerX, centerY - 100, nodeRadius, '', 'ROOT', false);
+            
+            // Level 1 nodes
+            drawNode(centerX - 90, centerY - 30, nodeRadius, 'a', '', false);
+            drawNode(centerX + 90, centerY - 30, nodeRadius, 'b', '', false);
+            
+            // Connect root to level 1
+            drawEdge(centerX, centerY - 100 + nodeRadius, centerX - 90, centerY - 30 - nodeRadius, false);
+            drawEdge(centerX, centerY - 100 + nodeRadius, centerX + 90, centerY - 30 - nodeRadius, false);
+            
+            // Level 2 nodes
+            drawNode(centerX - 90, centerY + 40, nodeRadius, 'p', '', false);
+            drawNode(centerX + 90, centerY + 40, nodeRadius, 'a', '', false);
+            
+            // Connect level 1 to level 2
+            drawEdge(centerX - 90, centerY - 30 + nodeRadius, centerX - 90, centerY + 40 - nodeRadius, true);
+            drawEdge(centerX + 90, centerY - 30 + nodeRadius, centerX + 90, centerY + 40 - nodeRadius, false);
+            
+            // Level 3 nodes
+            drawNode(centerX - 140, centerY + 110, nodeRadius, 'p', '', false);
+            drawNode(centerX - 40, centerY + 110, nodeRadius, 'r', '', false);
+            drawNode(centerX + 90, centerY + 110, nodeRadius, 'n', '', false);
+            
+            // Connect level 2 to level 3
+            drawEdge(centerX - 90, centerY + 40 + nodeRadius, centerX - 140, centerY + 110 - nodeRadius, true);
+            drawEdge(centerX - 90, centerY + 40 + nodeRadius, centerX - 40, centerY + 110 - nodeRadius, false);
+            drawEdge(centerX + 90, centerY + 40 + nodeRadius, centerX + 90, centerY + 110 - nodeRadius, false);
+            
+            // Level 4 nodes
+            drawNode(centerX - 140, centerY + 180, nodeRadius, 'l', '', false);
+            drawNode(centerX - 40, centerY + 180, nodeRadius, 'o', '', false);
+            drawNode(centerX + 90, centerY + 180, nodeRadius, 'a', '', false);
+            
+            // Connect level 3 to level 4
+            drawEdge(centerX - 140, centerY + 110 + nodeRadius, centerX - 140, centerY + 180 - nodeRadius, true);
+            drawEdge(centerX - 40, centerY + 110 + nodeRadius, centerX - 40, centerY + 180 - nodeRadius, false);
+            drawEdge(centerX + 90, centerY + 110 + nodeRadius, centerX + 90, centerY + 180 - nodeRadius, false);
+            
+            // Level 5 nodes
+            drawNode(centerX - 140, centerY + 250, nodeRadius, 'e', 'apple', true);
+            drawNode(centerX - 40, centerY + 250, nodeRadius, 'n', 'apron', false);
+            drawNode(centerX + 90, centerY + 250, nodeRadius, 'n', 'banana', false);
+            
+            // Connect level 4 to level 5
+            drawEdge(centerX - 140, centerY + 180 + nodeRadius, centerX - 140, centerY + 250 - nodeRadius, true);
+            drawEdge(centerX - 40, centerY + 180 + nodeRadius, centerX - 40, centerY + 250 - nodeRadius, false);
+            drawEdge(centerX + 90, centerY + 180 + nodeRadius, centerX + 90, centerY + 250 - nodeRadius, false);
+            
+            // Add fuzzy match annotation
+            ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#1a73e8';
+            ctx.textAlign = 'center';
+            ctx.fillText(`"${searchWord}" fuzzy matches "apple" with distance ${maxDistance}`, centerX, centerY + 300);
+            
+            // Add fuzzy match path annotation
+            ctx.font = '14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.textAlign = 'center';
+            ctx.fillText('The highlighted path shows the best match', centerX, centerY + 325);
+        }
+        
+        function drawExampleTrie2(centerX, centerY, width, height) {
+            // Draw root node
+            const nodeRadius = 25;
+            const verticalSpacing = 60;
+            drawNode(centerX, centerY - 100, nodeRadius, '', 'ROOT', false);
+            
+            // Create a linear trie for "application"
+            const word = "application";
+            let prevX = centerX;
+            let prevY = centerY - 100;
+            
+            for (let i = 0; i < word.length; i++) {
+                const currY = centerY - 100 + (i+1) * verticalSpacing;
+                
+                // Draw node
+                const isLast = i === word.length - 1;
+                drawNode(centerX, currY, nodeRadius, word[i], isLast ? 'application' : '', isLast && currentExample === 2);
+                
+                // Connect to previous
+                drawEdge(prevX, prevY + nodeRadius, centerX, currY - nodeRadius, currentExample === 2);
+                
+                prevY = currY;
+            }
+            
+            // Add fuzzy match annotation
+            ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#1a73e8';
+            ctx.textAlign = 'center';
+            ctx.fillText(`"${searchWord}" fuzzy matches "application" with distance ${maxDistance}`, centerX, centerY + 300);
+            
+            // Add fuzzy match path annotation
+            ctx.font = '14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.textAlign = 'center';
+            ctx.fillText('Inserted "p" is required to match the target word', centerX, centerY + 325);
+        }
+        
+        function drawNode(x, y, radius, char, word, isMatch) {
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            
+            if (isMatch) {
+                ctx.fillStyle = '#d7f9d4'; // Highlighted match
+            } else {
+                ctx.fillStyle = '#e8eaed'; // Regular node
+            }
+            
+            ctx.fill();
+            ctx.strokeStyle = isMatch ? '#34a853' : '#dadce0';
+            ctx.lineWidth = isMatch ? 2 : 1;
+            ctx.stroke();
+            
+            // Draw character in node
+            ctx.fillStyle = '#202124';
+            ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(char, x, y);
+            
+            // Draw word label if this is an end of word
+            if (word) {
+                ctx.font = '12px "Segoe UI", Arial, sans-serif';
+                ctx.fillStyle = isMatch ? '#34a853' : '#5f6368';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(word, x, y + radius + 10);
+            }
+        }
+        
+        function drawEdge(x1, y1, x2, y2, isHighlighted) {
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = isHighlighted ? '#1a73e8' : '#dadce0';
+            ctx.lineWidth = isHighlighted ? 2 : 1;
+            ctx.stroke();
+        }
+        
+        function drawExplanations() {
+            const explanationsTop = 570;
+            const columnWidth = canvas.width / 2;
+            
+            // Background box
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(50, explanationsTop - 20, canvas.width - 100, 180);
+            ctx.strokeStyle = '#dadce0';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(50, explanationsTop - 20, canvas.width - 100, 180);
+            
+            // Main explanation title
+            ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#202124';
+            ctx.textAlign = 'left';
+            ctx.fillText("How Fuzzy Search Works:", 70, explanationsTop);
+            
+            // Explanation steps
+            ctx.font = '15px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.textAlign = 'left';
+            
+            const explanations = [
+                "1. Calculate Levenshtein distance between search term and potential matches",
+                "2. Distance indicates minimum number of single-character edits needed",
+                "3. Edits include insertions, deletions, and substitutions",
+                "4. Matches with distance ≤ max allowed distance are returned as results",
+                "5. Lower distance = closer match = higher relevance"
+            ];
+            
+            explanations.forEach((text, i) => {
+                ctx.fillText(text, 90, explanationsTop + 30 + i * 25);
+            });
+            
+            // Practical applications
+            ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#202124';
+            ctx.textAlign = 'left';
+            ctx.fillText("Practical Applications:", 70 + columnWidth, explanationsTop);
+            
+            // Application list
+            ctx.font = '15px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.textAlign = 'left';
+            
+            const applications = [
+                "• Handling spelling errors in search queries",
+                "• \"Did you mean...\" suggestions",
+                "• Autocomplete with error tolerance",
+                "• Matching names despite variations",
+                "• Enhancing search result relevance"
+            ];
+            
+            applications.forEach((text, i) => {
+                ctx.fillText(text, 90 + columnWidth, explanationsTop + 30 + i * 25);
+            });
+        }
+        
+        function drawBottomCaption() {
+            const captionY = canvas.height - 30;
+            
+            ctx.font = 'italic 14px "Segoe UI", Arial, sans-serif';
+            ctx.fillStyle = '#5f6368';
+            ctx.textAlign = 'center';
+            ctx.fillText('Trie-Search-Plus Library - Fuzzy Search Implementation', canvas.width / 2, captionY);
+        }
+        
+        function drawColorSquare(x, y, color) {
+            ctx.fillStyle = color;
+            ctx.strokeStyle = '#dadce0';
+            ctx.lineWidth = 1;
+            ctx.fillRect(x, y - 10, 20, 20);
+            ctx.strokeRect(x, y - 10, 20, 20);
+        }
+
+        // Initialize with example 1
+        drawFuzzySearchVisualization();
+
+        // Button event listeners
+        document.getElementById('example1Btn').addEventListener('click', () => {
+            currentExample = 1;
+            searchWord = "aple";
+            matchWord = "apple";
+            maxDistance = 1;
+            drawFuzzySearchVisualization();
+        });
+        
+        document.getElementById('example2Btn').addEventListener('click', () => {
+            currentExample = 2;
+            searchWord = "aplication";
+            matchWord = "application";
+            maxDistance = 2;
+            drawFuzzySearchVisualization();
+        });
+
+        // Download functionality
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'fuzzy-search.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>
