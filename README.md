@@ -3,6 +3,8 @@
 ![npm](https://img.shields.io/npm/v/trie-search-plus)
 ![License](https://img.shields.io/npm/l/trie-search-plus)
 ![Downloads](https://img.shields.io/npm/dw/trie-search-plus)
+![Build Status](https://github.com/bharath1708/trie-search-plus/actions/workflows/npm-publish.yml/badge.svg)
+
 A powerful, lightweight Trie-based search and autocomplete library for JavaScript applications, now with **Web Worker (browser) and Worker Thread (Node.js) support** for large datasets.
 
 ## Table of Contents
@@ -232,6 +234,9 @@ All methods are **async**:
 3. Run tests: `npm test`
 4. Submit PR
 
+### Continuous Integration
+All commits are automatically tested and built using [GitHub Actions](https://github.com/bharath1708/trie-search-plus/actions).
+
 ---
 
 ## License
@@ -241,3 +246,4 @@ MIT License - see [LICENSE](./LICENSE)
 ## Author
 
 Bharath Kumar
+
