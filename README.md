@@ -86,6 +86,7 @@ trie.insert('banana');
 
 console.log(trie.search('apple')); // true
 console.log(trie.startsWith('app')); // true
+console.log(trie.startsWith('appli')); // true
 console.log(trie.autocomplete('app')); // ['apple', 'application']
 ```
 
