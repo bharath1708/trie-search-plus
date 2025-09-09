@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trie Architecture Diagram</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #canvas {
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Trie Architecture Diagram</h1>
+    <div class="controls">
+        <button id="downloadBtn">Download Image</button>
+    </div>
+    <canvas id="canvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Draw the architecture diagram
+        function drawArchitecture() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Title
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Trie-Search-Plus Architecture', canvas.width / 2, 40);
+            
+            // Draw boxes for each component
+            const boxHeight = 80;
+            
+            // Abstract Trie
+            drawBox(canvas.width / 2, 120, 200, boxHeight, '#c8e6c9', 'AbstractTrie', 'Base class with common methods');
+            
+            // Trie class
+            drawBox(canvas.width / 4, 240, 180, boxHeight, '#bbdefb', 'Trie', 'Synchronous implementation');
+            
+            // TrieWorkerManager
+            drawBox(canvas.width * 3 / 4, 240, 180, boxHeight, '#bbdefb', 'TrieWorkerManager', 'Asynchronous implementation');
+            
+            // TrieFactory
+            drawBox(canvas.width / 2, 360, 250, boxHeight, '#ffecb3', 'TrieFactory', 'Creates appropriate Trie instance');
+            
+            // Worker Thread
+            drawBox(canvas.width * 3 / 4, 450, 150, 70, '#e1bee7', 'Worker Thread', 'Runs in separate thread');
+            
+            // Draw arrows
+            // Abstract Trie to Trie
+            drawArrow(canvas.width / 2, 120 + boxHeight / 2, canvas.width / 4, 240 - boxHeight / 2, 'extends');
+            
+            // Abstract Trie to TrieWorkerManager
+            drawArrow(canvas.width / 2, 120 + boxHeight / 2, canvas.width * 3 / 4, 240 - boxHeight / 2, 'implements API');
+            
+            // TrieFactory to Trie
+            drawArrow(canvas.width / 2 - 60, 360, canvas.width / 4, 240 + boxHeight / 2, 'creates', true);
+            
+            // TrieFactory to TrieWorkerManager
+            drawArrow(canvas.width / 2 + 60, 360, canvas.width * 3 / 4, 240 + boxHeight / 2, 'creates', true);
+            
+            // TrieWorkerManager to Worker Thread
+            drawArrow(canvas.width * 3 / 4, 240 + boxHeight / 2, canvas.width * 3 / 4, 450 - boxHeight / 2, 'manages');
+            
+            // Add legend
+            const legendX = 50;
+            const legendY = canvas.height - 120;
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Legend:', legendX, legendY);
+            
+            ctx.font = '14px Arial';
+            drawColorSquare(legendX + 10, legendY + 25, '#c8e6c9');
+            ctx.fillText('Abstract Class', legendX + 30, legendY + 30);
+            
+            drawColorSquare(legendX + 10, legendY + 50, '#bbdefb');
+            ctx.fillText('Concrete Implementation', legendX + 30, legendY + 55);
+            
+            drawColorSquare(legendX + 10, legendY + 75, '#ffecb3');
+            ctx.fillText('Factory', legendX + 30, legendY + 80);
+            
+            drawColorSquare(legendX + 200, legendY + 25, '#e1bee7');
+            ctx.fillText('Worker Thread', legendX + 220, legendY + 30);
+        }
+        
+        function drawBox(x, y, width, height, color, title, description) {
+            ctx.fillStyle = color;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            
+            // Draw rounded rectangle
+            const radius = 10;
+            ctx.beginPath();
+            ctx.moveTo(x - width / 2 + radius, y - height / 2);
+            ctx.lineTo(x + width / 2 - radius, y - height / 2);
+            ctx.arcTo(x + width / 2, y - height / 2, x + width / 2, y - height / 2 + radius, radius);
+            ctx.lineTo(x + width / 2, y + height / 2 - radius);
+            ctx.arcTo(x + width / 2, y + height / 2, x + width / 2 - radius, y + height / 2, radius);
+            ctx.lineTo(x - width / 2 + radius, y + height / 2);
+            ctx.arcTo(x - width / 2, y + height / 2, x - width / 2, y + height / 2 - radius, radius);
+            ctx.lineTo(x - width / 2, y - height / 2 + radius);
+            ctx.arcTo(x - width / 2, y - height / 2, x - width / 2 + radius, y - height / 2, radius);
+            ctx.closePath();
+            
+            ctx.fill();
+            ctx.stroke();
+            
+            // Draw title
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(title, x, y - height / 4);
+            
+            // Draw description
+            ctx.font = '14px Arial';
+            ctx.fillText(description, x, y + height / 4);
+        }
+        
+        function drawArrow(fromX, fromY, toX, toY, label, reverse = false) {
+            // Calculate angle
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+            const headLen = 15;
+            
+            // Draw line
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            
+            // Adjust end points to not overlap with boxes
+            const lineLength = Math.sqrt(Math.pow(toX - fromX, 2) + Math.pow(toY - fromY, 2));
+            const shortenAmount = 20;
+            const endX = fromX + (toX - fromX) * (lineLength - shortenAmount) / lineLength;
+            const endY = fromY + (toY - fromY) * (lineLength - shortenAmount) / lineLength;
+            
+            ctx.lineTo(endX, endY);
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw the arrow head
+            if (!reverse) {
+                ctx.beginPath();
+                ctx.moveTo(endX, endY);
+                ctx.lineTo(endX - headLen * Math.cos(angle - Math.PI / 6), endY - headLen * Math.sin(angle - Math.PI / 6));
+                ctx.lineTo(endX - headLen * Math.cos(angle + Math.PI / 6), endY - headLen * Math.sin(angle + Math.PI / 6));
+                ctx.closePath();
+                ctx.fillStyle = '#666';
+                ctx.fill();
+            } else {
+                // Arrow points to the source instead
+                ctx.beginPath();
+                ctx.moveTo(fromX, fromY);
+                ctx.lineTo(fromX + headLen * Math.cos(angle - Math.PI / 6 + Math.PI), fromY + headLen * Math.sin(angle - Math.PI / 6 + Math.PI));
+                ctx.lineTo(fromX + headLen * Math.cos(angle + Math.PI / 6 + Math.PI), fromY + headLen * Math.sin(angle + Math.PI / 6 + Math.PI));
+                ctx.closePath();
+                ctx.fillStyle = '#666';
+                ctx.fill();
+            }
+            
+            // Draw the label
+            const midX = (fromX + toX) / 2;
+            const midY = (fromY + toY) / 2;
+            
+            // Background for label
+            const labelWidth = ctx.measureText(label).width + 10;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.fillRect(midX - labelWidth / 2, midY - 10, labelWidth, 20);
+            
+            ctx.fillStyle = '#333';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(label, midX, midY);
+        }
+        
+        function drawColorSquare(x, y, color) {
+            ctx.fillStyle = color;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.fillRect(x, y - 8, 15, 15);
+            ctx.strokeRect(x, y - 8, 15, 15);
+        }
+
+        // Initialize
+        drawArchitecture();
+
+        // Download functionality
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'trie-architecture.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>

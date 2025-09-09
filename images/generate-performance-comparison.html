@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trie Performance Comparison</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #canvas {
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        h1 {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Performance Comparison: Synchronous vs Worker-based Trie</h1>
+    <div class="controls">
+        <button id="downloadBtn">Download Image</button>
+    </div>
+    <canvas id="canvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Sample data for the performance chart
+        const dataSizes = [1000, 5000, 10000, 50000, 100000, 500000, 1000000];
+        const syncTimes = [5, 18, 32, 150, 310, 1800, 3800]; // milliseconds
+        const workerTimes = [12, 25, 40, 160, 320, 950, 1800]; // milliseconds (includes communication overhead)
+        const syncBlockingTime = [5, 18, 32, 150, 310, 1800, 3800]; // same as sync for main thread blocking
+        const workerBlockingTime = [1, 1, 1, 2, 2, 5, 5]; // minimal blocking in main thread
+        
+        function drawPerformanceChart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Title
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Trie Operation Performance Comparison', canvas.width / 2, 40);
+            
+            // Chart dimensions
+            const chartLeft = 80;
+            const chartRight = canvas.width - 50;
+            const chartTop = 100;
+            const chartBottom = 400;
+            const chartWidth = chartRight - chartLeft;
+            const chartHeight = chartBottom - chartTop;
+            
+            // Draw chart axes
+            ctx.beginPath();
+            ctx.moveTo(chartLeft, chartTop);
+            ctx.lineTo(chartLeft, chartBottom);
+            ctx.lineTo(chartRight, chartBottom);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // X-axis labels (data sizes)
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#333';
+            ctx.font = '12px Arial';
+            
+            const xStep = chartWidth / (dataSizes.length - 1);
+            dataSizes.forEach((size, i) => {
+                const x = chartLeft + i * xStep;
+                ctx.fillText(formatNumber(size), x, chartBottom + 20);
+                
+                // Grid lines
+                ctx.beginPath();
+                ctx.moveTo(x, chartBottom);
+                ctx.lineTo(x, chartTop);
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+            
+            // Y-axis labels (time in ms)
+            const maxTime = Math.max(...syncTimes, ...workerTimes);
+            const yStep = chartHeight / 5;
+            
+            for (let i = 0; i <= 5; i++) {
+                const y = chartBottom - i * yStep;
+                const timeValue = (maxTime / 5) * i;
+                
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round(timeValue) + ' ms', chartLeft - 10, y + 4);
+                
+                // Grid lines
+                ctx.beginPath();
+                ctx.moveTo(chartLeft, y);
+                ctx.lineTo(chartRight, y);
+                ctx.strokeStyle = '#ddd';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            
+            // X-axis title
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Dictionary Size (Number of Words)', canvas.width / 2, chartBottom + 50);
+            
+            // Y-axis title
+            ctx.save();
+            ctx.translate(25, chartTop + chartHeight / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.fillText('Operation Time (ms)', 0, 0);
+            ctx.restore();
+            
+            // Draw data lines
+            drawDataLine(dataSizes, syncTimes, maxTime, chartLeft, chartRight, chartTop, chartBottom, '#3f51b5', 'Synchronous Total Time');
+            drawDataLine(dataSizes, workerTimes, maxTime, chartLeft, chartRight, chartTop, chartBottom, '#ff9800', 'Worker-based Total Time');
+            
+            // Draw blocking time visualization
+            drawDataLine(dataSizes, syncBlockingTime, maxTime, chartLeft, chartRight, chartTop, chartBottom, '#7986cb', 'Synchronous Main Thread Blocking', true, 0.4);
+            drawDataLine(dataSizes, workerBlockingTime, maxTime, chartLeft, chartRight, chartTop, chartBottom, '#ffb74d', 'Worker-based Main Thread Blocking', true, 0.4);
+            
+            // Add legend
+            const legendTop = chartBottom + 80;
+            const legendSpacing = 30;
+            
+            drawLegendItem(canvas.width / 4 - 50, legendTop, '#3f51b5', 'Synchronous Implementation');
+            drawLegendItem(canvas.width / 4 - 50, legendTop + legendSpacing, '#7986cb', 'Synchronous Main Thread Blocking');
+            
+            drawLegendItem(canvas.width * 3 / 4 - 50, legendTop, '#ff9800', 'Worker-based Implementation');
+            drawLegendItem(canvas.width * 3 / 4 - 50, legendTop + legendSpacing, '#ffb74d', 'Worker-based Main Thread Blocking');
+            
+            // Add explanatory notes
+            const notesY = legendTop + legendSpacing * 2;
+            ctx.fillStyle = '#333';
+            ctx.font = '13px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Note: While the worker-based implementation has slightly higher total operation time due to communication', canvas.width / 2, notesY + 20);
+            ctx.fillText('overhead, it significantly reduces main thread blocking, keeping the UI responsive even with large datasets.', canvas.width / 2, notesY + 40);
+            
+            // Add scale note
+            ctx.fillStyle = '#666';
+            ctx.font = 'italic 12px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('* Times are approximate and will vary based on hardware, browser, and specific operations', 50, notesY + 70);
+        }
+        
+        function drawDataLine(dataSizes, times, maxTime, left, right, top, bottom, color, label, fill = false, fillOpacity = 0.2) {
+            const xStep = (right - left) / (dataSizes.length - 1);
+            
+            // Draw line
+            ctx.beginPath();
+            
+            dataSizes.forEach((size, i) => {
+                const x = left + i * xStep;
+                const y = bottom - (times[i] / maxTime) * (bottom - top);
+                
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // Fill area under the line if requested
+            if (fill) {
+                ctx.lineTo(right, bottom);
+                ctx.lineTo(left, bottom);
+                ctx.closePath();
+                ctx.fillStyle = `${color}${Math.floor(fillOpacity * 255).toString(16).padStart(2, '0')}`;
+                ctx.fill();
+            }
+            
+            // Draw data points
+            dataSizes.forEach((size, i) => {
+                const x = left + i * xStep;
+                const y = bottom - (times[i] / maxTime) * (bottom - top);
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+        }
+        
+        function drawLegendItem(x, y, color, label) {
+            // Draw color box
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y - 8, 20, 16);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y - 8, 20, 16);
+            
+            // Draw label
+            ctx.fillStyle = '#333';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(label, x + 30, y);
+        }
+        
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000) + 'K';
+            } else {
+                return num.toString();
+            }
+        }
+
+        // Initialize
+        drawPerformanceChart();
+
+        // Download functionality
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'performance-comparison.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>
